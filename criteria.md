@@ -44,60 +44,66 @@ Two things worth knowing before you pick numbers:
 ---
 ## 1.
 
-<!-- Your criterion. It must name a number. -->
-
-
+Of 10 pieces of writing I identify as human-authored, no more than 1 is
+labeled high-confidence AI.
 
 **Why this target:**
 
+Accusing a real writer is more harmful than allowing some AI-written text
+through, so false positives must be rare.
 
 
 ---
 
 ## 2.
 
-<!-- Your criterion. -->
-
-
+Clearly human and clearly AI test texts should have combined scores at least
+0.20 apart in each of three evaluation trials.
 
 **Why this target:**
 
+The system needs a measurable separation between its reference cases, while
+allowing for variation from the local model.
 
 
 ---
 
 ## 3.
 
-<!-- Your criterion. -->
-
-
+At least one test input must produce each of the `human`, `unsure`, and `ai`
+labels in the score ranges defined by `config.py`.
 
 **Why this target:**
 
+All three outcomes are part of the service contract. An unreachable label
+would make the user-facing uncertainty design incomplete.
 
 
 ---
 
 ## 4.
 
-<!-- Your criterion. -->
-
-
+For every valid submission, an appeal with its returned `content_id` must
+return HTTP 200, report `under_review`, and add an appeal entry to the audit
+log.
 
 **Why this target:**
 
+An appeal is the writer's only immediate response to a disputed decision, so
+it must be observable and reliably connected to the original submission.
 
 
 ---
 
 ## 5.
 
-<!-- Your criterion. -->
-
-
+Missing, empty, non-string, and over-20,000-character `text` values must
+return HTTP 400 with a JSON error, and none may produce an HTTP 500.
 
 **Why this target:**
 
+Malformed input is expected in real traffic and attack traffic. Returning a
+clear client error is safer than crashing or creating a fake decision.
 
 
 ---
