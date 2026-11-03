@@ -224,15 +224,23 @@ $ curl "http://127.0.0.1:5000/log?limit=3"
 
 **Moment 1**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* I asked AI to read the starter repository and explain the
+  service architecture, unfinished milestones, and required endpoint behavior.
+- *What came back:* It identified the local model signal, the stylometry signal,
+  the scoring pipeline, audit logging, and the appeal workflow.
+- *What I changed:* I used that explanation to understand the request flow and
+  decide the validation, scoring, and label behavior before implementing it.
 
 **Moment 2**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* I asked AI to implement and validate the submission and
+  appeal routes, stylometry calculations, scoring, labels, and audit behavior.
+- *What came back:* It produced an implementation with input validation,
+  append-only logging, two combined signals, three labels, and a tested appeal
+  path.
+- *What I changed:* I reviewed the implementation, chose a 20,000-character
+  input limit and balanced signal weights, ran the supported Python 3.13
+  checks, and verified a real local-model submission.
 
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
@@ -372,7 +380,8 @@ that produced it:
        [ ] Signals and Scoring names scoring.py::combine_signals
        [ ] Sample Run: a submission AND an appeal, as pasted text
        [ ] At least four new commits
-       [ ] Repository URL submitted — WRITE IT DOWN
+       [x] Repository URL submitted:
+           https://github.com/arjunmagarcode/ai201-project4-provenance-guard-starter-v2026
 
      SUBMISSION CHECKLIST — unit 8
 
