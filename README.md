@@ -39,6 +39,19 @@
 <!-- The path a submission takes, from arriving to the label a reader sees.
      Six or seven steps — this is the trace you wrote in Milestone 1. -->
 
+1. `POST /submit` validates a JSON object containing non-empty `text` and
+   `creator_id`; text longer than 20,000 characters is rejected.
+2. `detector.py::model_signal` measures how predictable the text is to local
+   GPT-2; higher scores are more AI-like.
+3. `stylometry.py::style_signal` measures sentence-length variation,
+   vocabulary variety, and punctuation density; higher scores are more
+   AI-like.
+4. `scoring.py::combine_signals` calculates a balanced weighted average.
+5. `scoring.py::score_to_label` maps the score to `human`, `unsure`, or `ai`.
+6. `audit.py::log_decision` records the scores and decision in
+   `logs/audit.jsonl`, and the route returns the same evidence as JSON.
+7. A writer can submit the returned `content_id` to `POST /appeal`; the appeal
+   is appended to the log and changes the item's status to `under_review`.
 
 
 ---
@@ -53,35 +66,53 @@
 
 ### Signal one — the model signal
 
-**What it measures:**
+**What it measures:** GPT-2 perplexity, converted to a 0–1 predictability
+score. Lower perplexity means the model found the text easier to predict, so
+the returned AI-likelihood score is higher.
 
-**Why that might differ between human and AI writing:**
+**Why that might differ between human and AI writing:** Generated writing
+often uses likely next words and familiar sentence patterns, which a language
+model can predict easily.
 
-**What it can't see:**
+**What it can't see:** Predictability is not authorship. Plain writing by a
+second-language writer, younger writer, or careful human can look AI-like, and
+unusual human prose can look less AI-like.
 
 ### Signal two — the style signal
 
-**What it measures:**
+**What it measures:** Sentence-length spread, type-token ratio (unique words
+divided by total words), and punctuation density.
 
-**Why that might differ between human and AI writing:**
+**Why that might differ between human and AI writing:** Generated prose often
+has consistent sentence lengths and repeated vocabulary, while human writing
+can be more uneven.
 
-**What it can't see:**
+**What it can't see:** It cannot understand meaning or authorship. Typos,
+quotations, sentence splitting, or other formatting changes can alter the
+score without changing who wrote the text.
 
 ### The combining rule
 
 <!-- Write the rule in words, then give the numbers. What happens when the two
      signals disagree? -->
 
-**The rule:**
+**The rule:** Use a weighted average. When the signals disagree, the result
+stays between them and becomes less certain rather than allowing either signal
+to decide alone.
 
-**The numbers:**
+**The numbers:** 50% model signal and 50% style signal. Human is `<= 0.35`,
+unsure is `0.35–0.65`, and AI is `>= 0.65`.
 
 **Where it lives:** `scoring.py::combine_signals`
 
 <!-- ⚠️ The grader checks your code against that line. If your rule lives
      somewhere else, say where. -->
 
-**A case where my two signals split, and what my rule does with it:**
+**A case where my two signals split, and what my rule does with it:** A text
+with predictable wording but varied sentence lengths can produce a high model
+score and a lower style score. The equal weighting moves the combined score
+toward the middle, where the service can say it is unsure instead of making a
+high-confidence accusation.
 
 
 
@@ -96,11 +127,13 @@
 
 | Label | Score range | The exact text a reader sees |
 |---|---|---|
-| high-confidence human |  |  |
-| unsure |  |  |
-| high-confidence AI |  |  |
+| high-confidence human | 0.00–0.35 | We think this was probably written by a person. |
+| unsure | 0.35–0.65 | We cannot tell reliably whether this was written by a person or an AI system. |
+| high-confidence AI | 0.65–1.00 | We think this was probably written by an AI system. |
 
-**Why I worded the "unsure" one this way:**
+**Why I worded the "unsure" one this way:** It communicates uncertainty without
+calling the writer dishonest. The score is evidence for review, not proof of
+who wrote the text.
 <!-- It's the hardest of the three. It has to admit uncertainty without
      sounding like an accusation, because the person reading it may well have
      written every word themselves. -->
@@ -128,7 +161,14 @@ $ curl -X POST http://127.0.0.1:5000/submit \
 ```
 
 ```json
-
+{
+  "confidence": 0.2003,
+  "content_id": "c144ed30-78c6-4d4d-90bd-b14d0716b357",
+  "guess": "human",
+  "label": "We think this was probably written by a person.",
+  "model_score": 0.1402,
+  "style_score": 0.2604
+}
 ```
 
 **An appeal**
@@ -140,7 +180,11 @@ $ curl -X POST http://127.0.0.1:5000/appeal \
 ```
 
 ```json
-
+{
+  "content_id": "c144ed30-78c6-4d4d-90bd-b14d0716b357",
+  "message": "Your appeal was recorded and is under review.",
+  "status": "under_review"
+}
 ```
 
 **What the log shows afterwards**
@@ -150,7 +194,28 @@ $ curl "http://127.0.0.1:5000/log?limit=3"
 ```
 
 ```json
-
+{
+  "count": 2,
+  "entries": [
+    {
+      "combined_score": 0.2003,
+      "content_id": "c144ed30-78c6-4d4d-90bd-b14d0716b357",
+      "creator_id": "sample-writer",
+      "guess": "human",
+      "label": "We think this was probably written by a person.",
+      "model_score": 0.1402,
+      "status": "decided",
+      "style_score": 0.2604
+    },
+    {
+      "content_id": "c144ed30-78c6-4d4d-90bd-b14d0716b357",
+      "creator_id": "sample-writer",
+      "event": "appeal",
+      "reasoning": "This sample was written by me for the project test.",
+      "status": "under_review"
+    }
+  ]
+}
 ```
 
 ---
