@@ -49,6 +49,9 @@ def bodies_for(scenario):
     A "texts" scenario gets a creator_id made up for it. A "bodies" scenario is
     sent exactly as written, which is how a bad-input criterion says things a
     string can't — no `text` field, a null, something enormous.
+
+    An "appeals" scenario submits each text and then posts an appeal for the
+    returned content_id, recording both HTTP and under_review results.
     """
     if scenario.get("bodies"):
         return list(scenario["bodies"])
@@ -56,6 +59,10 @@ def bodies_for(scenario):
         {"text": text, "creator_id": f"eval_{scenario['name'][:12]}_{i}"}
         for i, text in enumerate(scenario["texts"], 1)
     ]
+
+
+def is_appeal_scenario(scenario):
+    return bool(scenario.get("appeals"))
 
 
 def describe(body):
@@ -113,14 +120,35 @@ def main():
         trials = []
         for trial in range(1, args.trials + 1):
             results = []
-            for i, body in enumerate(bodies_for(scenario), 1):
+            texts = scenario.get("appeals") if is_appeal_scenario(scenario) else None
+            bodies = bodies_for(scenario) if not texts else [
+                {"text": text, "creator_id": f"eval_appeal_{trial}_{i}"}
+                for i, text in enumerate(texts, 1)
+            ]
+            for i, body in enumerate(bodies, 1):
                 preview = describe(body)
                 try:
                     response = requests.post(f"{args.url}/submit", json=body,
                                              timeout=args.timeout)
                     payload = response.json() if response.content else {}
+                    appeal = None
+                    if is_appeal_scenario(scenario) and response.status_code == 200:
+                        appeal_response = requests.post(
+                            f"{args.url}/appeal",
+                            json={
+                                "content_id": payload.get("content_id"),
+                                "reasoning": "Requesting review of this decision.",
+                            },
+                            timeout=args.timeout,
+                        )
+                        appeal = appeal_response.json() if appeal_response.content else {}
                     results.append({
                         "status": response.status_code,
+                        "appeal_status": appeal.get("status") if appeal else None,
+                        "appeal_http_status": (
+                            appeal_response.status_code
+                            if appeal is not None else None
+                        ),
                         "guess": payload.get("guess"),
                         "confidence": payload.get("confidence"),
                         "model_score": payload.get("model_score"),
